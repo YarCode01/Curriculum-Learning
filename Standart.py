@@ -75,11 +75,10 @@ batch_size = 64
 input_size = 784
 hidden_sizes = [50, 100, 200, 400, 800, 1600]
 num_classes = 10
-std = 0.3 ## standart deviation of a gaussian noise
+std = 0.2 ## standart deviation of a gaussian noise
 learning_rate = 0.001
 num_epochs = 100
 curriculum_learning = -1 # -1 for anticurriculum, 1 for curriculum, 0 for random, None for standart
-arr_epochs_switch = [2,3,4,5]
 
 torch.manual_seed(123)
 
@@ -94,14 +93,12 @@ pure_test_dataset = torchvision.datasets.FashionMNIST(root="./data", train=False
 perturbed_test_dataset = torchvision.datasets.FashionMNIST(root="./data", train=False, transform=GaussianTransform, download=False)
 
 size = 10000
-indices = torch.randperm(size)
-train_ind = indices[:int(0.8*size)] # 80 percent for the training set
-test_ind = indices[int(0.8*size)::]
+train_ind = torch.randperm(size)
 
 train_pure = Subset(pure_train_dataset, train_ind[:len(train_ind)//2])# splitting training data set into two parts: pure and perturbed
 train_perturbed = Subset(perturbed_train_dataset, train_ind[len(train_ind)//2::])
 
-test_pure = Subset(pure_train_dataset, train_ind)# using the same samples for testing, one test set is with noise, the other isn't. 
+test_pure = Subset(pure_train_dataset, train_ind)#using the same samples for testing, one test set is with noise, the other isn't. 
 test_perturbed = Subset(perturbed_train_dataset, train_ind)
 
 mixed_train_loader = torch.utils.data.DataLoader(dataset=torch.utils.data.ConcatDataset([train_pure, train_perturbed]), batch_size=batch_size, shuffle = True)
@@ -114,7 +111,7 @@ perturbed_test_loader = torch.utils.data.DataLoader(dataset=test_perturbed, batc
 
 total_n_data = len(mixed_train_loader)*num_epochs
 
-f = open(f"/Users/yaraslauivashynka/Desktop/project/Curriculum_learning/results/results_standard_seed.txt", "a")
+f = open(f"results/results_standard.txt", "a")
 f.write(f"std: {std}\n")
 
 for hidden_size in hidden_sizes:

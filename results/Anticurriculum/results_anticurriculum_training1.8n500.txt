@@ -1,0 +1,13 @@
+std: 0.2, num_epochs500
+After the first part of learning: Hidden size: 50, accuracy on pure_set: 82.1, accuracy on perturbed set: 82.06
+Hidden size: 50, accuracy on pure_set: 84.54, accuracy on perturbed set: 77.88
+After the first part of learning: Hidden size: 100, accuracy on pure_set: 83.67, accuracy on perturbed set: 82.63
+Hidden size: 100, accuracy on pure_set: 84.77, accuracy on perturbed set: 79.44
+After the first part of learning: Hidden size: 200, accuracy on pure_set: 82.22, accuracy on perturbed set: 82.9
+Hidden size: 200, accuracy on pure_set: 85.47, accuracy on perturbed set: 81.79
+After the first part of learning: Hidden size: 400, accuracy on pure_set: 82.68, accuracy on perturbed set: 83.42
+Hidden size: 400, accuracy on pure_set: 85.86, accuracy on perturbed set: 81.79
+After the first part of learning: Hidden size: 800, accuracy on pure_set: 83.47, accuracy on perturbed set: 83.47
+Hidden size: 800, accuracy on pure_set: 85.52, accuracy on perturbed set: 82.22
+After the first part of learning: Hidden size: 1600, accuracy on pure_set: 83.12, accuracy on perturbed set: 83.21
+Hidden size: 1600, accuracy on pure_set: 85.86, accuracy on perturbed set: 81.77

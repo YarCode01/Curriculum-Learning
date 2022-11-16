@@ -73,13 +73,13 @@ def eval_loss_and_error(model, loader, device=None):
 batch_size = 64
 input_size = 784
 hidden_sizes = [50, 100, 200, 400, 800, 1600]
-drop_rates = [3,5,7, 10, 15]
+drop_rate = 5
 num_classes = 10
 std = 0.2 ## standart deviation of a gaussian noise
 learning_rate = 0.001
-num_epochs = 100
-curriculum_learning = 1 # -1 for anticurriculum, 1 for curriculum, 0 for random, None for standart
-factor_epochs_switch = 2
+ratios = [1.2, 1.4, 1.6, 1.8, 2, 2.2, 2.5]
+num_epochs = 500
+
 
 torch.manual_seed(123)
 
@@ -109,17 +109,20 @@ pure_test_loader = torch.utils.data.DataLoader(dataset=pure_test_dataset, batch_
 perturbed_test_loader = torch.utils.data.DataLoader(dataset=perturbed_test_dataset, batch_size=batch_size, shuffle = True) 
 
 
+
 total_n_data = len(mixed_train_loader)*num_epochs
-for drop_rate in drop_rates:
-    f = open(f"results_curriculum_training{drop_rate}.txt", "a")
-    f.write(f"std: {std}\n")
+for ratio_first_second_phase in ratios:
+    num_epochs_first_phase = int((num_epochs * 2 * ratio_first_second_phase)/(ratio_first_second_phase + 1))
+    num_epoch_second_phase = int((num_epochs * 2)/(ratio_first_second_phase + 1))
+    f = open(f"results_curriculum_training{ratio_first_second_phase}n{num_epochs}.txt", "a")
+    f.write(f"std: {std}, num_epochs{num_epochs}\n")
 
     for hidden_size in hidden_sizes:
         model = NeuralNet(input_size=input_size, hidden_size=hidden_size, num_classes=num_classes)
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         # Training on pure dataset
-        for epoch in range(num_epochs):
+        for epoch in range(num_epochs_first_phase):
             train(criterion=criterion, model=model, loader = pure_train_loader, optimizer=optimizer)
             if epoch%10 == 0:
                 print(f"hidden size: {hidden_size}, {epoch/(num_epochs*2)*100}%")
@@ -128,16 +131,16 @@ for drop_rate in drop_rates:
         acc_perturbed = eval_loss_and_error(model=model, loader=perturbed_test_loader)
         f.write(f"After the first part of learning: Hidden size: {hidden_size}, accuracy on pure_set: {acc_pure}, accuracy on perturbed set: {acc_perturbed}\n")
 
-        for g in optimizer.param_groups: # droping learning rate by 10
+        for g in optimizer.param_groups: # droping learning rate
                 g['lr'] = learning_rate/drop_rate
         #Training on perturbed dataset
-        for epoch in range(num_epochs):
+        for epoch in range(num_epoch_second_phase):
             train(criterion=criterion, model=model, loader=perturbed_train_loader, optimizer=optimizer)
             if epoch%10 == 0:
                 print(f"hidden size: {hidden_size}, {(0.5+epoch/(num_epochs*2))*100}%")
         acc_pure = eval_loss_and_error(model=model,  loader=pure_test_loader)
         acc_perturbed = eval_loss_and_error(model=model, loader=perturbed_test_loader)
-        f.write(f"Hidden size: {hidden_size}, accuracy on pure_set: {acc_pure}, accuracy on perturbed set: {acc_perturbed}\n")
+        f.write(f"Hidden size: {hidden_size}, accuracy on pure_set: {acc_pure}, accuracy on perturbed set: {acc_perturbed}\n")  
     f.close()
 
 
