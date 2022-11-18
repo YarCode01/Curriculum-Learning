@@ -87,7 +87,7 @@ proportion = 0.5 #proportion of the training set to which apply the Gaussian No
 use_cuda = torch.cuda.is_available()
 device = torch.device(f"cuda" if use_cuda else "cpu")
 
-  print(f"USE_CUDA = {use_cuda},  DEVICE_COUNT={torch.cuda.device_count()}, NUM_CPU_THREADS={torch.get_num_threads()}")
+print(f"USE_CUDA = {use_cuda},  DEVICE_COUNT={torch.cuda.device_count()}, NUM_CPU_THREADS={torch.get_num_threads()}")
 
 torch.manual_seed(123)
 
