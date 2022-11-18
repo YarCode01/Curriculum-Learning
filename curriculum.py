@@ -5,16 +5,20 @@ import torchvision.transforms as transforms
 from torch.utils.data import Dataset, Subset
 import numpy as np
 import matplotlib.pyplot as plt
+import random
 
 class AddGaussianNoise(object):
-    def __init__(self, mean=0., std=1.):
+    def __init__(self, mean=0., std=1., proportion=1):
+
         self.std = std
         self.mean = mean
+        self.portion = proportion
         
     def __call__(self, tensor):
-        tensor += torch.normal(mean=self.mean, std=self.std, size=tensor.size())
-        tensor = torch.min(torch.ones(tensor.size()), tensor)
-        tensor = torch.max(torch.zeros(tensor.size()), tensor)
+        if random.uniform(a=0, b=1) <= self.proportion or self.proportion == 1:
+            tensor += torch.normal(mean=self.mean, std=self.std, size=tensor.size())
+            tensor = torch.min(torch.ones(tensor.size()), tensor)
+            tensor = torch.max(torch.zeros(tensor.size()), tensor)
         return tensor
     
     def __repr__(self):
