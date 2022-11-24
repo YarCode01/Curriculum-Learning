@@ -1,0 +1,28 @@
+std: 0.2, num_epochs500, drop rate = 7
+After the first part of learning
+Hidden size: 50, accuracy on pure_set: 84.49, accuracy on perturbed set: 83.15
+After the second part of learning
+Hidden size: 50, accuracy on pure_set: 85.44, accuracy on perturbed set: 84.04
+After the first part of learning
+Hidden size: 100, accuracy on pure_set: 84.89, accuracy on perturbed set: 83.86
+After the second part of learning
+Hidden size: 100, accuracy on pure_set: 85.91, accuracy on perturbed set: 85.05
+After the first part of learning
+Hidden size: 200, accuracy on pure_set: 84.79, accuracy on perturbed set: 83.82
+After the second part of learning
+Hidden size: 200, accuracy on pure_set: 85.86, accuracy on perturbed set: 84.95
+After the first part of learning
+Hidden size: 400, accuracy on pure_set: 85.12, accuracy on perturbed set: 84.36
+After the second part of learning
+Hidden size: 400, accuracy on pure_set: 86.1, accuracy on perturbed set: 85.32
+After the first part of learning
+Hidden size: 800, accuracy on pure_set: 85.06, accuracy on perturbed set: 84.15
+After the second part of learning
+Hidden size: 800, accuracy on pure_set: 86.28, accuracy on perturbed set: 85.1
+After the first part of learning
+Hidden size: 1600, accuracy on pure_set: 84.75, accuracy on perturbed set: 83.8
+After the second part of learning
+Hidden size: 1600, accuracy on pure_set: 86.3, accuracy on perturbed set: 85.44
+
+
+I just realised how much I love you. I know it sound stupid, but this thing about like money and everything is not annoying and somehow disrupting. Cause you once said about wishing that your parents could just afford things like it easily. But I hope these things seeing me just selling the iPad or other things that I get "easily" is just not influencing your perception of me. Pinky? Exactly, I knew that you are such a pure soul that things like this don't annoy you, because for many people they would. Actually, subconsciously even I would feel something like this, I would understand that it is not right and I would fight it, but I would still have it. That's why I am so grateful for  how you are, and I hope I am doing a lot of things  

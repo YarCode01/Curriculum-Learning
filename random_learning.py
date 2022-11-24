@@ -11,7 +11,7 @@ class AddGaussianNoise(object):
     def __init__(self, mean=0., std=1., proportion=1):
         self.std = std
         self.mean = mean
-        self.portion = proportion
+        self.proportion = proportion
         
     def __call__(self, tensor):
         if random.uniform(a=0, b=1) <= self.proportion or self.proportion == 1:
@@ -75,12 +75,12 @@ def eval_loss_and_error(model, loader, device=None):
 
 batch_size = 64
 input_size = 784
-hidden_sizes = [100]#[50, 100, 200, 400, 800, 1600]
+hidden_sizes = [50, 100, 200, 400, 800, 1600]
 drop_rate = 7
 num_classes = 10
 std = 0.2 ## standart deviation of a gaussian noise
 learning_rate = 0.001
-ratios = [1.2]#[1.2, 1.4, 1.6, 1.8, 2]
+ratios = [1, 1.2, 1.4]
 num_epochs = 500
 proportion = 0.5 #proportion of the training set to which apply the Gaussian No
 
@@ -106,7 +106,7 @@ size = 10000
 indices = torch.randperm(size)
 train_ind = indices
 
-train_mixed_first = Subset(pure_train_dataset, train_ind[:len(train_ind)//2])# splitting training data set into two parts: pure and perturbed
+train_mixed_first = Subset(perturbed_train_dataset, train_ind[:len(train_ind)//2])# splitting training data set into two parts: pure and perturbed
 train_mixed_second = Subset(perturbed_train_dataset, train_ind[len(train_ind)//2::])
 
 first_loader = torch.utils.data.DataLoader(dataset=train_mixed_first, batch_size=batch_size, shuffle = True)
@@ -136,7 +136,7 @@ for ratio_first_second_phase in ratios:
         acc_pure = eval_loss_and_error(model=model,  loader=pure_test_loader, device=device)
         acc_perturbed = eval_loss_and_error(model=model, loader=perturbed_test_loader, device=device)
         f.write(f"After the first part of learning\n")
-        f.write("Hidden size: {hidden_size}, accuracy on pure_set: {acc_pure}, accuracy on perturbed set: {acc_perturbed}\n")
+        f.write(f"Hidden size: {hidden_size}, accuracy on pure_set: {acc_pure}, accuracy on perturbed set: {acc_perturbed}\n")
 
         for g in optimizer.param_groups: # droping learning rate
                 g['lr'] = learning_rate/drop_rate

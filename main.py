@@ -5,16 +5,22 @@ import torchvision.transforms as transforms
 from torch.utils.data import Dataset, Subset
 import numpy as np
 import matplotlib.pyplot as plt
+import random
+from torch.utils.tensorboard import SummaryWriter
+
 
 class AddGaussianNoise(object):
-    def __init__(self, mean=0., std=1.):
+    def __init__(self, mean=0., std=1., proportion=1):
+
         self.std = std
         self.mean = mean
+        self.proportion = proportion
         
     def __call__(self, tensor):
-        tensor += torch.normal(mean=self.mean, std=self.std, size=tensor.size())
-        tensor = torch.min(torch.ones(tensor.size()), tensor)
-        tensor = torch.max(torch.zeros(tensor.size()), tensor)
+        if random.uniform(a=0, b=1) <= self.proportion or self.proportion == 1:
+            tensor += torch.normal(mean=self.mean, std=self.std, size=tensor.size())
+            tensor = torch.min(torch.ones(tensor.size()), tensor)
+            tensor = torch.max(torch.zeros(tensor.size()), tensor)
         return tensor
     
     def __repr__(self):
@@ -36,12 +42,10 @@ class NeuralNet(nn.Module):
         out = self.l3(out)
         return out
 
-def train(loss, model, device, train_loader, optimizer):
-    for i, (images, labels) in enumerate(mixed_train_loader):  
-        # origin shape: [100, 1, 28, 28]
-        # resized: [100, 784]
-        images = images.reshape(-1, 28*28)
-        labels = labels
+def train(criterion, model, loader, optimizer, device=None):
+    for i, (images, labels) in enumerate(loader):  
+        images = images.reshape(-1, 28*28).to(device)
+        labels = labels.to(device)
         
         # Forward pass
         outputs = model(images)
@@ -51,26 +55,55 @@ def train(loss, model, device, train_loader, optimizer):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        
-        if (i+1) % 100 == 0:
-            _, predicted = torch.max(outputs.data, 1)
-            n_samples = labels.size(0)
-            n_correct = (predicted == labels).sum().item()
-            print (f'Epoch [{epoch+1}/{num_epochs}], Step [{i+1}/{n_total_steps}], Loss: {loss.item():.4f}, Accuracy: {n_correct*100.0/len(outputs)}%')
     
 
+# def eval_loss_and_error(loss, model, loader, device=None):
+#     n_correct = 0
+#     n_samples = 0
+#     l = 0
+#     with torch.no_grad():
+#         for images, labels in loader:
+#             images = images.reshape(-1, 28*28)
+#             output = model(images)
+#             l += loss(output, labels, reduction='sum').item()
+#             _, predicted = torch.max(output.data, 1)
+#             n_samples += labels.size(0)
+#             n_correct += (predicted == labels).sum().item()
 
+#         acc = 100.0 * n_correct / n_samples
+#     return acc
 
+def eval_loss_and_error(criterion, model, loader, device=None):
+    l, accuracy, ndata = 0, 0, 0
+    with torch.no_grad():
+        for data, target in loader:
+            data = data.reshape(-1, 28*28)
+            data, target = data.to(device), target.to(device)
+            output = model(data)
+            l += criterion(output, target).item()
+            pred = output.argmax(dim=1, keepdim=True)
+            accuracy += pred.eq(target.view_as(pred)).sum().item()
+            ndata += len(data)
+    
+    return l/ndata, (1-accuracy/ndata)*100
+
+use_cuda = torch.cuda.is_available()
+device = torch.device(f"cuda" if use_cuda else "cpu")
+
+print(f"USE_CUDA = {use_cuda},  DEVICE_COUNT={torch.cuda.device_count()}, NUM_CPU_THREADS={torch.get_num_threads()}")
 
 batch_size = 64
 input_size = 784
-hidden_sizes = [50, 100, 200, 400]
+hidden_sizes = [50, 100, 150, 200, 300, 400]
+drop_rate = 5
 num_classes = 10
 std = 0.2 ## standart deviation of a gaussian noise
 learning_rate = 0.001
-num_epochs = 50
-num_batches_switch = 3
+num_epochs = 500
+size = 10000
 
+
+torch.manual_seed(123)
 
 GaussianNoise = AddGaussianNoise(mean=0, std=std)
 PureTransform = transforms.Compose([transforms.ToTensor()])
@@ -82,78 +115,50 @@ perturbed_train_dataset = torchvision.datasets.FashionMNIST(root="./data", train
 pure_test_dataset = torchvision.datasets.FashionMNIST(root="./data", train=False, transform=PureTransform, download=False)
 perturbed_test_dataset = torchvision.datasets.FashionMNIST(root="./data", train=False, transform=GaussianTransform, download=False)
 
-size = 10000
-indices = torch.randperm(size)
-train_ind = indices[:int(0.8*size)] # 80 percent for the training set
-test_ind = indices[int(0.8*size):size]
-train_ind.shape, test_ind.shape
 
-train_pure = Subset(pure_train_dataset, train_ind[:len(train_ind)//2])
+indices = torch.randperm(size)
+train_ind = indices
+
+train_pure = Subset(pure_train_dataset, train_ind[:len(train_ind)//2])# splitting training data set into two parts: pure and perturbed
 train_perturbed = Subset(perturbed_train_dataset, train_ind[len(train_ind)//2::])
 
-test_pure = Subset(pure_train_dataset, train_ind)
-test_perturbed = Subset(perturbed_train_dataset, train_ind)
-
 mixed_train_loader = torch.utils.data.DataLoader(dataset=torch.utils.data.ConcatDataset([train_pure, train_perturbed]), batch_size=batch_size, shuffle = True)
-
+ 
 pure_train_loader = torch.utils.data.DataLoader(dataset=train_pure, batch_size=batch_size, shuffle = True)
 perturbed_train_loader = torch.utils.data.DataLoader(dataset=train_perturbed, batch_size=batch_size, shuffle = True)
-pure_test_loader = torch.utils.data.DataLoader(dataset=test_pure, batch_size=batch_size, shuffle = True) 
-perturbed_test_loader = torch.utils.data.DataLoader(dataset=test_perturbed, batch_size=batch_size, shuffle = True) 
+
+pure_test_loader = torch.utils.data.DataLoader(dataset=pure_test_dataset, batch_size=batch_size, shuffle = True) 
+perturbed_test_loader = torch.utils.data.DataLoader(dataset=perturbed_test_dataset, batch_size=batch_size, shuffle = True) 
 
 
-model = NeuralNet(input_size, hidden_sizes[1], num_classes)
-criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-n_total_steps = len(mixed_train_loader)
-for epoch in range(num_epochs):
-    for i, (images, labels) in enumerate(mixed_train_loader):  
-        # origin shape: [100, 1, 28, 28]
-        # resized: [100, 784]
-        images = images.reshape(-1, 28*28)
-        labels = labels
-        
-        # Forward pass
-        outputs = model(images)
-        loss = criterion(outputs, labels)
-        
-        # Backward and optimize
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        
-        if (i+1) % 100 == 0:
-            _, predicted = torch.max(outputs.data, 1)
-            n_samples = labels.size(0)
-            n_correct = (predicted == labels).sum().item()
-            print (f'Epoch [{epoch+1}/{num_epochs}], Step [{i+1}/{n_total_steps}], Loss: {loss.item():.4f}, Accuracy: {n_correct*100.0/len(outputs)}%')
 
-with torch.no_grad():
-    n_correct = 0
-    n_samples = 0
-    for images, labels in pure_test_loader:
-        images = images.reshape(-1, 28*28)
-        labels = labels
-        outputs = model(images)
-        # max returns (value ,index)
-        _, predicted = torch.max(outputs.data, 1)
-        n_samples += labels.size(0)
-        n_correct += (predicted == labels).sum().item()
+for hidden_size in hidden_sizes:
+    writer = SummaryWriter(log_dir=f"results/Standart, hidden_size={hidden_size}, learning_rate={learning_rate},num_epochs={num_epochs}, train_size={size}")
+    model = NeuralNet(input_size=input_size, hidden_size=hidden_size, num_classes=num_classes).to(device)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    acc = 100.0 * n_correct / n_samples
-    print(f'Accuracy of the pure dataset: {acc} %')
+    def report(epoch):
+        o = dict() # store observations
+        o["epoch"] = epoch
+        o["lr"] = optimizer.param_groups[0]["lr"]
+        o["train_loss"], o["train_error"] = \
+            eval_loss_and_error(criterion=criterion, model=model, loader=mixed_train_loader, device=device)
+        o["test_loss_pure"], o["test_error_pure"] = \
+            eval_loss_and_error(criterion=criterion, model=model, loader=pure_test_loader, device=device)
+        o["test_loss_pertubed"], o["test_error_pertubed"] = \
+            eval_loss_and_error(criterion=criterion, model=model, loader=perturbed_test_loader, device=device)
 
-with torch.no_grad():
-    n_correct = 0
-    n_samples = 0
-    for images, labels in perturbed_test_loader:
-        images = images.reshape(-1, 28*28)
-        labels = labels
-        outputs = model(images)
-        # max returns (value ,index)
-        _, predicted = torch.max(outputs.data, 1)
-        n_samples += labels.size(0)
-        n_correct += (predicted == labels).sum().item()
+        for k in o:
+            writer.add_scalar(k, o[k], epoch)
+    
+    for epoch in range(num_epochs):
+        train(criterion=criterion, model=model, loader = mixed_train_loader, optimizer=optimizer, device=device)
+        if epoch%5 == 0:
+            print(f"{epoch/num_epochs*100}")
+            report(epoch)
 
-    acc = 100.0 * n_correct / n_samples
-    print(f'Accuracy of the perturbed dataset: {acc} %')
+
+
+
+
