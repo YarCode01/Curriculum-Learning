@@ -6,13 +6,14 @@ from torch.utils.data import Dataset, Subset
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+from torch.utils.tensorboard import SummaryWriter
 
 class AddGaussianNoise(object):
     def __init__(self, mean=0., std=1., proportion=1):
 
         self.std = std
         self.mean = mean
-        self.portion = proportion
+        self.proportion = proportion
         
     def __call__(self, tensor):
         if random.uniform(a=0, b=1) <= self.proportion or self.proportion == 1:
@@ -23,7 +24,7 @@ class AddGaussianNoise(object):
     
     def __repr__(self):
         return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
-        
+
 class NeuralNet(nn.Module):
     def __init__(self, input_size, hidden_size, num_classes):
         super(NeuralNet, self).__init__()
@@ -40,12 +41,10 @@ class NeuralNet(nn.Module):
         out = self.l3(out)
         return out
 
-def train(criterion, model, loader, optimizer):
+def train(criterion, model, loader, optimizer, device=None):
     for i, (images, labels) in enumerate(loader):  
-        # origin shape: [100, 1, 28, 28]
-        # resized: [100, 784]
-        images = images.reshape(-1, 28*28)
-        labels = labels
+        images = images.reshape(-1, 28*28).to(device)
+        labels = labels.to(device)
         
         # Forward pass
         outputs = model(images)
@@ -57,33 +56,65 @@ def train(criterion, model, loader, optimizer):
         optimizer.step()
     
 
-def eval_loss_and_error(model, loader, device=None):
-    n_correct = 0
-    n_samples = 0
-    with torch.no_grad():
-        for images, labels in loader:
-            images = images.reshape(-1, 28*28)
-            labels = labels
-            outputs = model(images)
-            # max returns (value ,index)
-            _, predicted = torch.max(outputs.data, 1)
-            n_samples += labels.size(0)
-            n_correct += (predicted == labels).sum().item()
+# def eval_loss_and_error(loss, model, loader, device=None):
+#     n_correct = 0
+#     n_samples = 0
+#     l = 0
+#     with torch.no_grad():
+#         for images, labels in loader:
+#             images = images.reshape(-1, 28*28)
+#             output = model(images)
+#             l += loss(output, labels, reduction='sum').item()
+#             _, predicted = torch.max(output.data, 1)
+#             n_samples += labels.size(0)
+#             n_correct += (predicted == labels).sum().item()
 
-        acc = 100.0 * n_correct / n_samples
-    return acc
+#         acc = 100.0 * n_correct / n_samples
+#     return acc
+
+def eval_loss_and_error(criterion, model, loader, device=None):
+    l, accuracy, ndata = 0, 0, 0
+    with torch.no_grad():
+        for data, target in loader:
+            data = data.reshape(-1, 28*28)
+            data, target = data.to(device), target.to(device)
+            output = model(data)
+            l += criterion(output, target).item()
+            pred = output.argmax(dim=1, keepdim=True)
+            accuracy += pred.eq(target.view_as(pred)).sum().item()
+            ndata += len(data)
+    
+    return l/ndata, (1-accuracy/ndata)*100
+
+def report(epoch, optimizer, criterion, model, train_loader, pure_test_loader, perturbed_test_loader, device):
+    o = dict() # store observations
+    o["epoch"] = epoch
+    o["lr"] = optimizer.param_groups[0]["lr"]
+    o["train_loss"], o["train_error"] = \
+        eval_loss_and_error(criterion=criterion, model=model, loader=train_loader, device=device)
+    o["test_loss_pure"], o["test_error_pure"] = \
+        eval_loss_and_error(criterion=criterion, model=model, loader=pure_test_loader, device=device)
+    o["test_loss_pertubed"], o["test_error_pertubed"] = \
+        eval_loss_and_error(criterion=criterion, model=model, loader=perturbed_test_loader, device=device)
+
+    for k in o:
+        writer.add_scalar(k, o[k], epoch)
     
 
 batch_size = 64
 input_size = 784
-hidden_sizes = [50, 100, 200, 400, 800, 1600]
-drop_rate = 5
+hidden_sizes = [15, 30, 60, 100, 125, 150, 200]
+drop_rate = 10
 num_classes = 10
 std = 0.2 ## standart deviation of a gaussian noise
 learning_rate = 0.001
-ratios = [1.2, 1.4, 1.6, 1.8, 2]
-num_epochs = 500
+num_epochs = 300
+size = 10000
 
+use_cuda = torch.cuda.is_available()
+device = torch.device(f"cuda" if use_cuda else "cpu")
+
+print(f"USE_CUDA = {use_cuda},  DEVICE_COUNT={torch.cuda.device_count()}, NUM_CPU_THREADS={torch.get_num_threads()}")
 
 torch.manual_seed(123)
 
@@ -97,7 +128,7 @@ perturbed_train_dataset = torchvision.datasets.FashionMNIST(root="./data", train
 pure_test_dataset = torchvision.datasets.FashionMNIST(root="./data", train=False, transform=PureTransform, download=False)
 perturbed_test_dataset = torchvision.datasets.FashionMNIST(root="./data", train=False, transform=GaussianTransform, download=False)
 
-size = 10000
+
 indices = torch.randperm(size)
 train_ind = indices
 
@@ -113,39 +144,30 @@ pure_test_loader = torch.utils.data.DataLoader(dataset=pure_test_dataset, batch_
 perturbed_test_loader = torch.utils.data.DataLoader(dataset=perturbed_test_dataset, batch_size=batch_size, shuffle = True) 
 
 
+for hidden_size in hidden_sizes:
+    writer = SummaryWriter(log_dir=f"results/Curriculum, hidden_size={hidden_size}, learning_rate={learning_rate},num_epochs={num_epochs}, train_size={size}")
+    model = NeuralNet(input_size=input_size, hidden_size=hidden_size, num_classes=num_classes)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-total_n_data = len(mixed_train_loader)*num_epochs
-for ratio_first_second_phase in ratios:
-    num_epochs_first_phase = int((num_epochs * 2 * ratio_first_second_phase)/(ratio_first_second_phase + 1))
-    num_epoch_second_phase = int((num_epochs * 2)/(ratio_first_second_phase + 1))
-    f = open(f"results_anticurriculum_training{ratio_first_second_phase}n{num_epochs}.txt", "a")
-    f.write(f"std: {std}, num_epochs{num_epochs}\n")
 
-    for hidden_size in hidden_sizes:
-        model = NeuralNet(input_size=input_size, hidden_size=hidden_size, num_classes=num_classes)
-        criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-        # Training on pure dataset
-        for epoch in range(num_epochs_first_phase):
-            train(criterion=criterion, model=model, loader = perturbed_train_loader, optimizer=optimizer)
-            if epoch%10 == 0:
-                print(f"hidden size: {hidden_size}, {epoch/(num_epochs*2)*100}%")
-
-        acc_pure = eval_loss_and_error(model=model,  loader=pure_test_loader)
-        acc_perturbed = eval_loss_and_error(model=model, loader=perturbed_test_loader)
-        f.write(f"After the first part of learning: Hidden size: {hidden_size}, accuracy on pure_set: {acc_pure}, accuracy on perturbed set: {acc_perturbed}\n")
-
-        for g in optimizer.param_groups: # droping learning rate
-                g['lr'] = learning_rate/drop_rate
-        #Training on perturbed dataset
-        for epoch in range(num_epoch_second_phase):
-            train(criterion=criterion, model=model, loader=pure_train_loader, optimizer=optimizer)
-            if epoch%10 == 0:
-                print(f"hidden size: {hidden_size}, {(0.5+epoch/(num_epochs*2))*100}%")
-        acc_pure = eval_loss_and_error(model=model,  loader=pure_test_loader)
-        acc_perturbed = eval_loss_and_error(model=model, loader=perturbed_test_loader)
-        f.write(f"Hidden size: {hidden_size}, accuracy on pure_set: {acc_pure}, accuracy on perturbed set: {acc_perturbed}\n")  
-    f.close()
+    # Training on pure dataset
+    for epoch in range(num_epochs):
+        train(criterion=criterion, model=model, loader = perturbed_train_loader, optimizer=optimizer, device=device)
+        if epoch%10 == 0:
+            print(f"{epoch/num_epochs/2*100}")
+            report(epoch//2, optimizer, criterion, model, perturbed_train_loader, pure_test_loader, perturbed_test_loader, device)
+       
+    for g in optimizer.param_groups: # droping learning rate
+            g['lr'] = learning_rate/drop_rate
+    #Training on perturbed dataset
+    for epoch in range(num_epochs):
+        train(criterion=criterion, model=model, loader=pure_train_loader, optimizer=optimizer)
+        if epoch%10 == 0:
+            print(f"{(0.5 + epoch/(num_epochs*2))*100}")
+            report(num_epochs//2 + epoch//2, optimizer, criterion, model, pure_train_loader, pure_test_loader, perturbed_test_loader, device)
+    
+    
 
 
 
