@@ -134,8 +134,6 @@ train_ind = indices
 
 train_pure = Subset(pure_train_dataset, train_ind[:len(train_ind)//2])# splitting training data set into two parts: pure and perturbed
 train_perturbed = Subset(perturbed_train_dataset, train_ind[len(train_ind)//2::])
-
-mixed_train_loader = torch.utils.data.DataLoader(dataset=torch.utils.data.ConcatDataset([train_pure, train_perturbed]), batch_size=batch_size, shuffle = True)
  
 pure_train_loader = torch.utils.data.DataLoader(dataset=train_pure, batch_size=batch_size, shuffle = True)
 perturbed_train_loader = torch.utils.data.DataLoader(dataset=train_perturbed, batch_size=batch_size, shuffle = True)
@@ -156,16 +154,16 @@ for hidden_size in hidden_sizes:
         train(criterion=criterion, model=model, loader = pure_train_loader, optimizer=optimizer, device=device)
         if epoch%10 == 0:
             print(f"{epoch/num_epochs/2*100}")
-            report(epoch//2, optimizer, criterion, model, pure_train_loader, pure_test_loader, perturbed_test_loader, device)
+            report(epoch = epoch//2, optimizer = optimizer, criterion = criterion, model = model, train_loader = pure_train_loader, pure_test_loader = pure_test_loader, perturbed_test_loader = perturbed_test_loader, device=device)
        
     for g in optimizer.param_groups: # droping learning rate
             g['lr'] = learning_rate/drop_rate
     #Training on perturbed dataset
     for epoch in range(num_epochs):
-        train(criterion=criterion, model=model, loader=perturbed_train_loader, optimizer=optimizer)
+        train(criterion=criterion, model=model, loader=perturbed_train_loader, optimizer=optimizer, device=device)
         if epoch%10 == 0:
             print(f"{(0.5 + epoch/(num_epochs*2))*100}")
-            report(num_epochs//2 + epoch//2, optimizer, criterion, model, perturbed_train_loader, pure_test_loader, perturbed_test_loader, device)
+            report(epoch = num_epochs//2 + epoch//2, optimizer=optimizer, criterion=criterion, model=model, train_loader=perturbed_train_loader, pure_test_loader= pure_test_loader, perturbed_test_loader = perturbed_test_loader, device = device)
     
     
 

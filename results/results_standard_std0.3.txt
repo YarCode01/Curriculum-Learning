@@ -1,7 +1,0 @@
-std: 0.3, num_epochs = 100
-Hidden size: 50, accuracy on pure_set: 95.2625, accuracy on perturbed set: 87.0625
-Hidden size: 100, accuracy on pure_set: 96.45, accuracy on perturbed set: 89.2875
-Hidden size: 200, accuracy on pure_set: 97.0875, accuracy on perturbed set: 90.6875
-Hidden size: 400, accuracy on pure_set: 97.0, accuracy on perturbed set: 91.4625
-Hidden size: 800, accuracy on pure_set: 97.625, accuracy on perturbed set: 91.9875
-Hidden size: 1600, accuracy on pure_set: 96.3875, accuracy on perturbed set: 91.725

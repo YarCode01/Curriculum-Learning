@@ -94,13 +94,13 @@ print(f"USE_CUDA = {use_cuda},  DEVICE_COUNT={torch.cuda.device_count()}, NUM_CP
 # os.environ["CUDA_VISIBLE_DEVICES"] = to_gpuid_string(gpu)
 batch_size = 64
 input_size = 784
-hidden_sizes = [15, 30, 60, 100, 125, 150, 200]
+hidden_sizes = [15, 30, 60, 100, 200]
 drop_rate = 5
 num_classes = 10
 std = 0.2 ## standart deviation of a gaussian noise
 learning_rate = 0.001
 num_epochs = 300
-size = 10000
+size = 7000
 
 
 torch.manual_seed(123)
