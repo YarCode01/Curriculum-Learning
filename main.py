@@ -10,14 +10,14 @@ from torch.utils.tensorboard import SummaryWriter
 
 
 class AddGaussianNoise(object):
-    def __init__(self, mean=0., std=1., proportion=1):
+    def __init__(self, mean=0., std=1., fraction=1):
 
         self.std = std
         self.mean = mean
-        self.proportion = proportion
+        self.fraction = fraction
         
     def __call__(self, tensor):
-        if random.uniform(a=0, b=1) <= self.proportion or self.proportion == 1:
+        if random.uniform(a=0, b=1) <= self.fraction or self.fraction == 1:
             tensor += torch.normal(mean=self.mean, std=self.std, size=tensor.size())
             tensor = torch.min(torch.ones(tensor.size()), tensor)
             tensor = torch.max(torch.zeros(tensor.size()), tensor)
@@ -100,7 +100,7 @@ num_classes = 10
 std = 0.2 ## standart deviation of a gaussian noise
 learning_rate = 0.001
 num_epochs = 300
-size = 7000
+size = 1000
 
 
 torch.manual_seed(123)

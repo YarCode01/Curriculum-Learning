@@ -9,14 +9,14 @@ import random
 from torch.utils.tensorboard import SummaryWriter
 
 class AddGaussianNoise(object):
-    def __init__(self, mean=0., std=1., proportion=1):
+    def __init__(self, mean=0., std=1., fraction=1):
 
         self.std = std
         self.mean = mean
-        self.proportion = proportion
+        self.fraction = fraction
         
     def __call__(self, tensor):
-        if random.uniform(a=0, b=1) <= self.proportion or self.proportion == 1:
+        if random.uniform(a=0, b=1) <= self.fraction or self.fraction == 1:
             tensor += torch.normal(mean=self.mean, std=self.std, size=tensor.size())
             tensor = torch.min(torch.ones(tensor.size()), tensor)
             tensor = torch.max(torch.zeros(tensor.size()), tensor)
@@ -110,7 +110,7 @@ std = 0.2 ## standart deviation of a gaussian noise
 learning_rate = 0.001
 num_epochs = 300
 size = 10000
-proportion = 0.5
+fraction = 0.5
 
 use_cuda = torch.cuda.is_available()
 device = torch.device(f"cuda" if use_cuda else "cpu")
@@ -119,12 +119,12 @@ print(f"USE_CUDA = {use_cuda},  DEVICE_COUNT={torch.cuda.device_count()}, NUM_CP
 
 torch.manual_seed(123)
 
-GaussianNoise_half = AddGaussianNoise(mean=0, std=std, proportion=proportion)
+GaussianNoise_half = AddGaussianNoise(mean=0, std=std, fraction = fraction)
 PureTransform = transforms.Compose([transforms.ToTensor()])
-GaussianTransform_half = transforms.Compose([transforms.ToTensor(), AddGaussianNoise(mean=0, std=std, proportion=proportion)])
-GaussianTransform_full = transforms.Compose([transforms.ToTensor(), AddGaussianNoise(mean=0, std=std, proportion=1)])
+GaussianTransform_half = transforms.Compose([transforms.ToTensor(), AddGaussianNoise(mean=0, std=std, fraction=fraction)])
+GaussianTransform_full = transforms.Compose([transforms.ToTensor(), AddGaussianNoise(mean=0, std=std, fraction=1)])
 
-perturbed_train_dataset = torchvision.datasets.FashionMNIST(root="./data", train=True, transform=transforms.Compose([transforms.ToTensor(), AddGaussianNoise(mean=0, std=std, proportion=proportion)]), download=False)
+perturbed_train_dataset = torchvision.datasets.FashionMNIST(root="./data", train=True, transform=transforms.Compose([transforms.ToTensor(), AddGaussianNoise(mean=0, std=std, fraction=fraction)]), download=False)
 
 pure_test_dataset = torchvision.datasets.FashionMNIST(root="./data", train=False, transform=PureTransform, download=False)
 perturbed_test_dataset = torchvision.datasets.FashionMNIST(root="./data", train=False, transform=GaussianTransform_full, download=False)

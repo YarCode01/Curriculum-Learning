@@ -9,21 +9,18 @@ import random
 from torch.utils.tensorboard import SummaryWriter
 
 class AddGaussianNoise(object):
-    def __init__(self, mean=0., std=1., proportion=1):
+    def __init__(self, mean=0., std=1., fraction=1):
 
         self.std = std
         self.mean = mean
-        self.proportion = proportion
+        self.fraction = fraction
         
     def __call__(self, tensor):
-        if random.uniform(a=0, b=1) <= self.proportion or self.proportion == 1:
+        if random.uniform(a=0, b=1) <= self.fraction or self.fraction == 1:
             tensor += torch.normal(mean=self.mean, std=self.std, size=tensor.size())
             tensor = torch.min(torch.ones(tensor.size()), tensor)
             tensor = torch.max(torch.zeros(tensor.size()), tensor)
         return tensor
-    
-    def __repr__(self):
-        return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
 
 class NeuralNet(nn.Module):
     def __init__(self, input_size, hidden_size, num_classes):
@@ -103,7 +100,7 @@ def report(epoch, optimizer, criterion, model, train_loader, pure_test_loader, p
 
 batch_size = 64
 input_size = 784
-hidden_sizes = [15, 30, 60, 100, 125, 150, 200]
+hidden_sizes = [15, 30, 60, 100, 200]
 drop_rate = 10
 num_classes = 10
 std = 0.2 ## standart deviation of a gaussian noise
@@ -145,27 +142,27 @@ perturbed_test_loader = torch.utils.data.DataLoader(dataset=perturbed_test_datas
 
 
 for hidden_size in hidden_sizes:
-    writer = SummaryWriter(log_dir=f"results/Curriculum, hidden_size={hidden_size}, learning_rate={learning_rate},num_epochs={num_epochs}, train_size={size}")
-    model = NeuralNet(input_size=input_size, hidden_size=hidden_size, num_classes=num_classes)
+    writer = SummaryWriter(log_dir=f"results/AntiCurriculum, hidden_size={hidden_size}, learning_rate={learning_rate},num_epochs={num_epochs}, train_size={size}")
+    model = NeuralNet(input_size=input_size, hidden_size=hidden_size, num_classes=num_classes).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 
-    # Training on pure dataset
+    # Training on perturbed dataset
     for epoch in range(num_epochs):
         train(criterion=criterion, model=model, loader = perturbed_train_loader, optimizer=optimizer, device=device)
         if epoch%10 == 0:
             print(f"{epoch/num_epochs/2*100}")
-            report(epoch//2, optimizer, criterion, model, perturbed_train_loader, pure_test_loader, perturbed_test_loader, device)
+            report(epoch = epoch//2, optimizer = optimizer, criterion = criterion, model = model, train_loader = perturbed_train_loader, pure_test_loader = pure_test_loader, perturbed_test_loader = perturbed_test_loader, device=device)
        
     for g in optimizer.param_groups: # droping learning rate
             g['lr'] = learning_rate/drop_rate
-    #Training on perturbed dataset
+    #Training on pure dataset
     for epoch in range(num_epochs):
-        train(criterion=criterion, model=model, loader=pure_train_loader, optimizer=optimizer)
+        train(criterion=criterion, model=model, loader=pure_train_loader, optimizer=optimizer, device=device)
         if epoch%10 == 0:
             print(f"{(0.5 + epoch/(num_epochs*2))*100}")
-            report(num_epochs//2 + epoch//2, optimizer, criterion, model, pure_train_loader, pure_test_loader, perturbed_test_loader, device)
+            report(epoch = num_epochs//2 + epoch//2, optimizer=optimizer, criterion=criterion, model=model, train_loader=pure_train_loader, pure_test_loader= pure_test_loader, perturbed_test_loader = perturbed_test_loader, device = device)
     
     
 
