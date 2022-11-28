@@ -17,10 +17,10 @@ class AddGaussianNoise(object):
         self.fraction = fraction
         
     def __call__(self, tensor):
-        # if random.uniform(a=0, b=1) <= self.fraction or self.fraction == 1:
-        tensor  += torch.normal(mean=self.mean, std=self.std, size=tensor.size())
-        tensor = torch.min(torch.ones(tensor.size()), tensor)
-        tensor = torch.max(torch.zeros(tensor.size()), tensor)
+        if random.uniform(a=0, b=1) <= self.fraction or self.fraction == 1:
+            tensor += torch.normal(mean=self.mean, std=self.std, size=tensor.size())
+            tensor = torch.min(torch.ones(tensor.size()), tensor)
+            tensor = torch.max(torch.zeros(tensor.size()), tensor)
         return tensor
     
     def __repr__(self):
@@ -56,29 +56,45 @@ def train(criterion, model, loader, optimizer, device=None):
         loss.backward()
         optimizer.step()
 
-def eval_loss_and_error(criterion, model, loader, device=None):
-    l, accuracy, ndata = 0, 0, 0
-    with torch.no_grad():
-        for data, target in loader:
-            data = data.reshape(-1, 28*28)
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-            l += criterion(output, target).item()
-            pred = output.argmax(dim=1, keepdim=True)
-            accuracy += pred.eq(target.view_as(pred)).sum().item()
-            ndata += len(data)
+# def eval_loss_and_error(criterion, model, loader, device=None):
+#     l, accuracy, ndata = 0, 0, 0
+#     with torch.no_grad():
+#         for data, target in loader:
+#             data = data.reshape(-1, 28*28)
+#             data, target = data.to(device), target.to(device)
+#             output = model(data)
+#             l += criterion(output, target).item()
+#             pred = output.argmax(dim=1, keepdim=True)
+#             accuracy += pred.eq(target.view_as(pred)).sum().item()
+#             ndata += len(data)
     
-    return l/ndata, (1-accuracy/ndata)*100
+#     return l/ndata, (1-accuracy/ndata)*100
+
+def eval_loss_and_error(criterion, model, loader, device=None):
+    n_correct = 0
+    n_samples = 0
+    with torch.no_grad():
+        for images, labels in loader:
+            images = images.reshape(-1, 28*28)
+            labels = labels
+            outputs = model(images)
+            # max returns (value ,index)
+            _, predicted = torch.max(outputs.data, 1)
+            n_samples += len(labels)
+            n_correct += (predicted == labels).sum().item()
+
+        acc = 100.0 * n_correct / n_samples
+    return acc
 
 def report(epoch, optimizer, criterion, model, train_loader, pure_test_loader, perturbed_test_loader, device):
     o = dict() # store observations
     o["epoch"] = epoch
     o["lr"] = optimizer.param_groups[0]["lr"]
-    o["train_loss"], o["train_error"] = \
+    o["train_error"] = \
         eval_loss_and_error(criterion=criterion, model=model, loader=train_loader, device=device)
-    o["test_loss_pure"], o["test_error_pure"] = \
+    o["test_error_pure"] = \
         eval_loss_and_error(criterion=criterion, model=model, loader=pure_test_loader, device=device)
-    o["test_loss_pertubed"], o["test_error_pertubed"] = \
+    o["test_error_pertubed"] = \
         eval_loss_and_error(criterion=criterion, model=model, loader=perturbed_test_loader, device=device)
 
     for k in o:
@@ -91,7 +107,7 @@ device = torch.device(f"cuda" if use_cuda else "cpu")
 
 print(f"USE_CUDA = {use_cuda},  DEVICE_COUNT={torch.cuda.device_count()}, NUM_CPU_THREADS={torch.get_num_threads()}")
 # os.environ["CUDA_VISIBLE_DEVICES"] = to_gpuid_string(gpu)
-batch_size = 200
+batch_size = 64
 input_size = 784
 hidden_sizes = [50, 100, 150]
 drop_rate = 3
@@ -102,12 +118,14 @@ num_epochs = 50
 size = 10000
 
 
+GaussianNoise_half = AddGaussianNoise(mean=0, std=std, fraction = 0.5)
 GaussianNoise = AddGaussianNoise(mean=0, std=std)
 PureTransform = transforms.Compose([transforms.ToTensor()])
 GaussianTransform = transforms.Compose([transforms.ToTensor(), GaussianNoise])
+GaussianTransform_half = transforms.Compose([transforms.ToTensor(), GaussianNoise_half])
 
 pure_train_dataset = torchvision.datasets.FashionMNIST(root="./data", train=True, transform=PureTransform, download=True)
-perturbed_train_dataset = torchvision.datasets.FashionMNIST(root="./data", train=True, transform=GaussianTransform, download=False)
+perturbed_train_dataset = torchvision.datasets.FashionMNIST(root="./data", train=True, transform=GaussianTransform_half, download=False)
 
 pure_test_dataset = torchvision.datasets.FashionMNIST(root="./data", train=False, transform=PureTransform, download=False)
 perturbed_test_dataset = torchvision.datasets.FashionMNIST(root="./data", train=False, transform=GaussianTransform, download=False)
@@ -119,7 +137,7 @@ train_ind = indices
 train_pure = Subset(pure_train_dataset, train_ind[:len(train_ind)//2])# splitting training data set into two parts: pure and perturbed
 train_perturbed = Subset(perturbed_train_dataset, train_ind[len(train_ind)//2::])
 
-mixed_train_loader = torch.utils.data.DataLoader(dataset=torch.utils.data.ConcatDataset([train_pure, train_perturbed]), batch_size=batch_size, shuffle = True)
+mixed_train_loader = torch.utils.data.DataLoader(dataset=perturbed_train_dataset, batch_size=batch_size, shuffle = True)
  
 pure_train_loader = torch.utils.data.DataLoader(dataset=train_pure, batch_size=batch_size, shuffle = True)
 perturbed_train_loader = torch.utils.data.DataLoader(dataset=train_perturbed, batch_size=batch_size, shuffle = True)
@@ -130,7 +148,7 @@ perturbed_test_loader = torch.utils.data.DataLoader(dataset=perturbed_test_datas
 
 
 for hidden_size in hidden_sizes:
-    writer = SummaryWriter(log_dir=f"results/Standart 200, hidden_size={hidden_size}, learning_rate={learning_rate},num_epochs={num_epochs}, train_size={size}, batch_size={batch_size}")
+    writer = SummaryWriter(log_dir=f"results/Standart_copy 6, hidden_size={hidden_size}, learning_rate={learning_rate},num_epochs={num_epochs}, train_size={size}")
     model = NeuralNet(input_size=input_size, hidden_size=hidden_size, num_classes=num_classes).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)

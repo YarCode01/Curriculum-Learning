@@ -86,12 +86,12 @@ def report(epoch, optimizer, criterion, model, train_loader, pure_test_loader, p
 
 batch_size = 64
 input_size = 784
-hidden_sizes = [15, 30, 60, 100, 200]
-drop_rate = 10
+hidden_sizes = [50, 100, 150]
+drop_rate = 3
 num_classes = 10
-std = 0.2 ## standart deviation of a gaussian noise
+std = 0.5 ## standart deviation of a gaussian noise
 learning_rate = 0.001
-num_epochs = 300
+num_epochs = 50
 size = 10000
 
 use_cuda = torch.cuda.is_available()
@@ -99,7 +99,6 @@ device = torch.device(f"cuda" if use_cuda else "cpu")
 
 print(f"USE_CUDA = {use_cuda},  DEVICE_COUNT={torch.cuda.device_count()}, NUM_CPU_THREADS={torch.get_num_threads()}")
 
-torch.manual_seed(123)
 
 GaussianNoise = AddGaussianNoise(mean=0, std=std)
 
@@ -129,7 +128,7 @@ perturbed_test_loader = torch.utils.data.DataLoader(dataset=perturbed_test_datas
 
 
 for hidden_size in hidden_sizes:
-    writer = SummaryWriter(log_dir=f"results/Curriculum, hidden_size={hidden_size}, learning_rate={learning_rate},num_epochs={num_epochs}, train_size={size}")
+    writer = SummaryWriter(log_dir=f"results/Curriculum 3, hidden_size={hidden_size}, learning_rate={learning_rate},num_epochs={num_epochs}, train_size={size}")
     model = NeuralNet(input_size=input_size, hidden_size=hidden_size, num_classes=num_classes).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -138,7 +137,7 @@ for hidden_size in hidden_sizes:
     # Training on pure dataset
     for epoch in range(num_epochs):
         train(criterion=criterion, model=model, loader = pure_train_loader, optimizer=optimizer, device=device)
-        if epoch%10 == 0:
+        if epoch%4 == 0:
             print(f"{epoch/num_epochs/2*100}")
             report(epoch = epoch//2, optimizer = optimizer, criterion = criterion, model = model, train_loader = pure_train_loader, pure_test_loader = pure_test_loader, perturbed_test_loader = perturbed_test_loader, device=device)
        
@@ -147,7 +146,7 @@ for hidden_size in hidden_sizes:
     #Training on perturbed dataset
     for epoch in range(num_epochs):
         train(criterion=criterion, model=model, loader=perturbed_train_loader, optimizer=optimizer, device=device)
-        if epoch%10 == 0:
+        if epoch%4 == 0:
             print(f"{(0.5 + epoch/(num_epochs*2))*100}")
             report(epoch = num_epochs//2 + epoch//2, optimizer=optimizer, criterion=criterion, model=model, train_loader=perturbed_train_loader, pure_test_loader= pure_test_loader, perturbed_test_loader = perturbed_test_loader, device = device)
     
